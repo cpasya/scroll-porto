@@ -7,6 +7,9 @@ import { useImagePreloaderEncoder } from "@/app/hooks/useImagePreloaderEncoder";
 
 const FRAME_COUNT = 168; // Sesuaikan lagi sama total frame lu
 
+const ASSET_BASE = process.env.NEXT_PUBLIC_ASSET_BASE_URL ?? "";
+
+
 // FIX 2: Tambahin scrollProgress ke dalam interface
 interface Sequence2CanvasProps {
     onProgress: (progress: number) => void;
@@ -157,7 +160,7 @@ export default function Sequence2Canvas({ onProgress, onLoaded, scrollProgress }
     }, [drawFrame]);
 
     const { isLoaded, images } = useImagePreloaderEncoder(
-        "/frames/sequence-2",
+        `${ASSET_BASE}/frames/sequence-1`,
         FRAME_COUNT,
         onProgress,
         onFrameLoaded

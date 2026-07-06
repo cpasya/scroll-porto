@@ -1,13 +1,17 @@
 "use client";
-
 import { useEffect, useRef, useCallback } from "react";
 // FIX: Hapus useScroll dari import, tambahkan MotionValue
 import { useSpring, MotionValue } from "framer-motion";
 import { useImagePreloaderEncoder } from "@/app/hooks/useImagePreloaderEncoder";
 
+// Base URL asset frame.
+// - Kosong ("") = ambil dari domain yang sama (path relatif). Cocok kalau frame di VPS yang sama.
+// - Isi di .env.local kalau frame dilayani dari domain/subdomain/CDN lain,
+//   contoh: NEXT_PUBLIC_ASSET_BASE_URL=https://assets.domainmu.com
+const ASSET_BASE = process.env.NEXT_PUBLIC_ASSET_BASE_URL ?? "";
+
 //frame-1
 const FRAME_COUNT = 118;
-
 //frame5
 // const FRAME_COUNT = 194;
 
@@ -18,7 +22,11 @@ interface PortraitCanvasProps {
   scrollProgress: MotionValue<number>;
 }
 
-export default function PortraitCanvas({ onProgress, onLoaded, scrollProgress }: PortraitCanvasProps) {
+export default function PortraitCanvas({
+  onProgress,
+  onLoaded,
+  scrollProgress,
+}: PortraitCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imagesRef = useRef<HTMLImageElement[]>([]);
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
@@ -85,25 +93,28 @@ export default function PortraitCanvas({ onProgress, onLoaded, scrollProgress }:
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = "high";
     ctxRef.current = ctx;
-
     lastFrameRef.current = -1;
+
     const index = Math.min(
       Math.floor(smoothProgress.get() * FRAME_COUNT),
-      FRAME_COUNT - 1,
+      FRAME_COUNT - 1
     );
     drawFrame(index);
   }, [smoothProgress, drawFrame]);
 
-  // ─── Preload menggunakan custom hook ───────────────────────────────────────────
-  const onFrameLoaded = useCallback((index: number) => {
-    if (index === 0) {
-      lastFrameRef.current = -1;
-      drawFrame(0);
-    }
-  }, [drawFrame]);
+  // ─── Preload menggunakan custom hook ───────────────────────────────────────
+  const onFrameLoaded = useCallback(
+    (index: number) => {
+      if (index === 0) {
+        lastFrameRef.current = -1;
+        drawFrame(0);
+      }
+    },
+    [drawFrame]
+  );
 
   const { isLoaded, images } = useImagePreloaderEncoder(
-    "/frames/sequence-1",
+    `${ASSET_BASE}/frames/sequence-1`, // 👈 sekarang ikut ASSET_BASE
     FRAME_COUNT,
     onProgress,
     onFrameLoaded
@@ -111,13 +122,12 @@ export default function PortraitCanvas({ onProgress, onLoaded, scrollProgress }:
 
   useEffect(() => {
     imagesRef.current = images;
-
     if (isLoaded) {
       onLoaded();
       lastFrameRef.current = -1;
       const index = Math.min(
         Math.floor(smoothProgress.get() * FRAME_COUNT),
-        FRAME_COUNT - 1,
+        FRAME_COUNT - 1
       );
       drawFrame(index);
     }
@@ -134,7 +144,6 @@ export default function PortraitCanvas({ onProgress, onLoaded, scrollProgress }:
       if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current);
       resizeTimerRef.current = setTimeout(initCanvas, 137);
     };
-
     window.addEventListener("resize", handleResize);
     return () => {
       window.removeEventListener("resize", handleResize);
@@ -143,23 +152,17 @@ export default function PortraitCanvas({ onProgress, onLoaded, scrollProgress }:
   }, [initCanvas]);
 
   // ─── Scroll sync ───────────────────────────────────────────────────────────
-  // FIX: Ubah SPEED_MULTIPLIER jadi 1 biar framenya habis berbarengan sama sisa scroll
   const SPEED_MULTIPLIER = 1.05;
-
   useEffect(() => {
     const unsubscribe = smoothProgress.on("change", (latest) => {
-      // FIX: Canvas cuma akan nge-render jika valuenya berubah, 
-      // dan karena diikat ke section masing-masing, dia otomatis diem (idle) kalau lagi nggak di-scroll.
       const clamped = Math.min(latest * SPEED_MULTIPLIER, 1);
       const index = Math.min(Math.floor(clamped * FRAME_COUNT), FRAME_COUNT - 1);
-
       const img = imagesRef.current[index];
       if (!img || !img.complete || img.naturalWidth === 0) return;
 
       if (rafIdRef.current) {
         cancelAnimationFrame(rafIdRef.current);
       }
-
       rafIdRef.current = requestAnimationFrame(() => {
         drawFrame(index);
       });
