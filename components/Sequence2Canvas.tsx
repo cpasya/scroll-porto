@@ -160,7 +160,7 @@ export default function Sequence2Canvas({ onProgress, onLoaded, scrollProgress }
     }, [drawFrame]);
 
     const { isLoaded, images } = useImagePreloaderEncoder(
-        `${ASSET_BASE}/frames/sequence-1`,
+        `${ASSET_BASE}/frames/sequence-2`,
         FRAME_COUNT,
         onProgress,
         onFrameLoaded
