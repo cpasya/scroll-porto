@@ -7,6 +7,7 @@ import {
   useSpring,
   useTransform,
   useMotionValue,
+  useMotionTemplate,
   useVelocity,
   useAnimationFrame,
 } from 'framer-motion';
@@ -31,20 +32,28 @@ export interface VelocityTextProps {
   scrollerStyle?: React.CSSProperties;
 }
 
+// PERF FIX #3: pakai ResizeObserver, bukan event "resize" window.
+// Di HP, scroll bikin address bar muncul/sembunyi -> event resize kepicu terus
+// (padahal LEBAR nggak berubah) -> re-render nggak perlu -> lag.
+// ResizeObserver cuma jalan kalau lebar elemen beneran berubah.
 function useElementWidth<T extends HTMLElement>(
   ref: React.RefObject<T | null>
 ): number {
   const [width, setWidth] = useState(0);
 
   useLayoutEffect(() => {
-    function updateWidth() {
-      if (ref.current) {
-        setWidth(ref.current.offsetWidth);
-      }
-    }
-    updateWidth();
-    window.addEventListener('resize', updateWidth);
-    return () => window.removeEventListener('resize', updateWidth);
+    const el = ref.current;
+    if (!el) return;
+
+    const update = () => {
+      // cuma update state kalau nilainya beneran beda
+      setWidth((prev) => (el.offsetWidth !== prev ? el.offsetWidth : prev));
+    };
+
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => observer.disconnect();
   }, [ref]);
 
   return width;
@@ -79,6 +88,7 @@ export const VelocityText: React.FC<VelocityTextProps> = ({
   const smoothVelocity = useSpring(scrollVelocity, {
     damping: damping ?? 50,
     stiffness: stiffness ?? 400,
+    restDelta: 0.001, // biar spring "settle" & berhenti hitung saat diam
   });
   const velocityFactor = useTransform(
     smoothVelocity,
@@ -90,22 +100,28 @@ export const VelocityText: React.FC<VelocityTextProps> = ({
   const copyRef = useRef<HTMLSpanElement>(null);
   const copyWidth = useElementWidth(copyRef);
 
+  // PERF FIX #2: transform ngeluarin ANGKA murni (bukan string "...px").
   const x = useTransform(baseX, (v) => {
-    if (copyWidth === 0) return '0px';
-    return `${wrap(-copyWidth, 0, v)}px`;
+    if (copyWidth === 0) return 0;
+    return wrap(-copyWidth, 0, v);
   });
+
+  // Bungkus jadi translate3d -> maksa browser bikin GPU compositing layer,
+  // jadi animasinya di-handle GPU (jauh lebih mulus di HP).
+  const transform = useMotionTemplate`translate3d(${x}px, 0, 0)`;
 
   const directionFactor = useRef<number>(1);
   useAnimationFrame((t, delta) => {
     let moveBy = directionFactor.current * baseVelocity * (delta / 1000);
 
-    if (velocityFactor.get() < 0) {
+    const factor = velocityFactor.get(); // panggil sekali, bukan 3x
+    if (factor < 0) {
       directionFactor.current = -1;
-    } else if (velocityFactor.get() > 0) {
+    } else if (factor > 0) {
       directionFactor.current = 1;
     }
 
-    moveBy += directionFactor.current * moveBy * velocityFactor.get();
+    moveBy += directionFactor.current * moveBy * factor;
     baseX.set(baseX.get() + moveBy);
   });
 
@@ -128,12 +144,18 @@ export const VelocityText: React.FC<VelocityTextProps> = ({
       style={parallaxStyle}
     >
       <motion.div
-        className={`${scrollerClassName} flex whitespace-nowrap text-center font-sans text-4xl font-bold tracking-[-0.02em] drop-shadow md:text-[5rem] md:leading-[5rem]`}
-        style={{ x, ...scrollerStyle }}
-      >
-      {spans}
-    </motion.div>
-    </div >
+        // PERF FIX #1: "drop-shadow" DIHAPUS — filter ini paling bikin berat
+        // buat teks besar yang gerak tiap frame di HP.
+        className={`${scrollerClassName} flex whitespace-nowrap text-center font-sans text-4xl font-bold tracking-[-0.02em] md:text-[5rem] md:leading-[5rem]`}
+        style={{
+          transform,
+          willChange: 'transform',
+          backfaceVisibility: 'hidden',
+          ...scrollerStyle,
+        }}>
+        {spans}
+      </motion.div>
+    </div>
   );
 };
 
