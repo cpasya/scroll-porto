@@ -305,7 +305,7 @@ export default function ScrollytellingPortfolio() {
 
 
   return (
-    <main className="bg-[#050505] text-black">
+    <main className="bg-[#050505] text-black overflow-x-clip">
       {/* Return-to-top curtain: menutup layar agar scrubbing webp tak terlihat */}
       <motion.div
         initial={{ opacity: 0 }}
@@ -514,7 +514,7 @@ export default function ScrollytellingPortfolio() {
       </section>
 
       {/* SECTION 3: Profile & Capabilities — tema hitam-putih elegan */}
-      <section className="relative min-h-screen overflow-hiddent text-white flex flex-col justify-center px-6 md:px-16 py-24 md:py-32 z-40">
+      <section className="relative min-h-screen overflow-hidden text-white flex flex-col justify-center px-6 md:px-16 py-24 md:py-32 z-40">
         {/* Cahaya radial halus + glow berdenyut biar terkesan mewah */}
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_bottom,rgba(255,255,255,0.08),transparent_55%)]" />
         <motion.div
