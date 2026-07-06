@@ -103,7 +103,7 @@ export default function PortraitCanvas({ onProgress, onLoaded, scrollProgress }:
   }, [drawFrame]);
 
   const { isLoaded, images } = useImagePreloaderEncoder(
-    "/sequence-1",
+    "/frames/sequence-1",
     FRAME_COUNT,
     onProgress,
     onFrameLoaded
